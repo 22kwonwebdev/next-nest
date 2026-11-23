@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../core/theme/app_colors.dart';
 import '../../models/quotation_model.dart';
 import '../../services/image_service.dart';
 import '../../services/pdf_service.dart';
@@ -53,9 +54,8 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen> {
       final pngBytes = await _capturePng();
       final bytes = await _pdfService.buildQuotationPdf(pngBytes);
       final fileName = '$_baseName.pdf';
-      final file = await _imageService.saveToLocal(fileName, bytes);
-      await _shareFile(file);
-      return 'PDF saved: ${file.path}';
+      final location = await _imageService.saveToDownloads(fileName, bytes);
+      return 'PDF saved to $location';
     });
   }
 
@@ -72,9 +72,18 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen> {
         ext = 'png';
       }
       final fileName = '$_baseName.$ext';
-      final file = await _imageService.saveToLocal(fileName, bytes);
+      final location = await _imageService.saveImageToGallery(fileName, bytes);
+      return 'Image saved to Photos/Gallery: $location';
+    });
+  }
+
+  Future<void> _sharePdf() async {
+    await _runExport(() async {
+      final pngBytes = await _capturePng();
+      final bytes = await _pdfService.buildQuotationPdf(pngBytes);
+      final file = await _imageService.saveToLocal('$_baseName.pdf', bytes);
       await _shareFile(file);
-      return 'Image saved: ${file.path}';
+      return 'PDF ready to share';
     });
   }
 
@@ -189,7 +198,7 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen> {
               _buildAction(
                 icon: Icons.share_outlined,
                 label: 'Share',
-                onPressed: _isExporting ? null : _exportPdf,
+                onPressed: _isExporting ? null : _sharePdf,
               ),
             ],
           ),
@@ -219,7 +228,7 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen> {
                 size: 22,
                 color: enabled
                     ? theme.colorScheme.primary
-                    : Colors.grey.shade400,
+                    : AppColors.textSecondary,
               ),
               const SizedBox(height: 4),
               Text(
@@ -227,7 +236,7 @@ class _QuotationPreviewScreenState extends State<QuotationPreviewScreen> {
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: enabled
                       ? theme.colorScheme.onSurface
-                      : Colors.grey.shade400,
+                      : AppColors.textSecondary,
                 ),
               ),
             ],

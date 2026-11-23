@@ -16,6 +16,7 @@ class AppTextField extends StatelessWidget {
   final ValueChanged<String>? onSubmitted;
   final List<TextInputFormatter>? inputFormatters;
   final TextCapitalization textCapitalization;
+  final TextStyle? style;
 
   const AppTextField({
     super.key,
@@ -33,6 +34,7 @@ class AppTextField extends StatelessWidget {
     this.onSubmitted,
     this.inputFormatters,
     this.textCapitalization = TextCapitalization.none,
+    this.style,
   });
 
   @override
@@ -48,6 +50,7 @@ class AppTextField extends StatelessWidget {
       maxLines: maxLines,
       inputFormatters: inputFormatters,
       textCapitalization: textCapitalization,
+      style: style,
       decoration: InputDecoration(
         labelText: labelText,
         hintText: hintText,

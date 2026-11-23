@@ -26,10 +26,11 @@ class SettingsScreen extends StatelessWidget {
                 children: [
                   _row('App', AppConstants.appName),
                   _row('Version', '1.0.0'),
-                  _row('Storage', 'Offline (SQLite)'),
+                  _row('Storage', 'SQLite (on this device)'),
                 ],
               ),
             ),
+            const SizedBox(height: 20),
           ],
         ),
       ),

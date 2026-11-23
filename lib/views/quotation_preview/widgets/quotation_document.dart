@@ -5,6 +5,7 @@ import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../models/quotation_model.dart';
+import '../../../widgets/common/quotation_totals_card.dart';
 
 /// Renders the quotation exactly as it should appear in exports.
 /// Wrapped in a RepaintBoundary by the preview screen for image capture.
@@ -80,7 +81,7 @@ class QuotationDocument extends StatelessWidget {
                     style: theme.textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.w800,
                       letterSpacing: 2,
-                      color: _primaryColor,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                 ],
@@ -104,7 +105,7 @@ class QuotationDocument extends StatelessWidget {
     final theme = Theme.of(context);
     final style = theme.textTheme.bodyMedium?.copyWith(
       fontWeight: FontWeight.w600,
-      color: Color(0xFF1E293B),
+      color: AppColors.textPrimary,
     );
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -135,7 +136,7 @@ class QuotationDocument extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 2),
       child: Text(
         text,
-        style: const TextStyle(fontSize: 14, color: Color(0xFF1E293B)),
+        style: const TextStyle(fontSize: 14, color: AppColors.textPrimary),
       ),
     );
   }
@@ -163,7 +164,7 @@ class QuotationDocument extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        border: Border.all(color: Color(0xFF64748B)),
+        border: Border.all(color: AppColors.textSecondary),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Column(
@@ -173,7 +174,7 @@ class QuotationDocument extends StatelessWidget {
           Text(
             title,
             style: theme.textTheme.labelLarge?.copyWith(
-              color: Color(0xFF64748B),
+              color: AppColors.textSecondary,
               letterSpacing: 1,
               fontWeight: FontWeight.w700,
             ),
@@ -218,7 +219,7 @@ class QuotationDocument extends StatelessWidget {
             style: theme.textTheme.bodySmall?.copyWith(
               fontWeight: FontWeight.w700,
               letterSpacing: 0.5,
-              color: Color(0xFF1E293B),
+              color: AppColors.textPrimary,
             ),
             textAlign: align,
           ),
@@ -226,13 +227,15 @@ class QuotationDocument extends StatelessWidget {
       );
     }
 
-    Widget cell(String text, {TextAlign align = TextAlign.left}) {
+    Widget cell(String text, {TextAlign align = TextAlign.left, bool bold = false}) {
       return TableCell(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
           child: Text(
             text,
-            style: theme.textTheme.bodyMedium,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: bold ? FontWeight.w700 : null,
+            ),
             textAlign: align,
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
@@ -244,7 +247,7 @@ class QuotationDocument extends StatelessWidget {
     final rows = <TableRow>[
       TableRow(
         decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+          border: Border(bottom: BorderSide(color: AppColors.border)),
         ),
         children: [
           headerCell('SN', align: TextAlign.center),
@@ -269,7 +272,7 @@ class QuotationDocument extends StatelessWidget {
                   child: Text(
                     i == 1 ? 'No items' : '',
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      color: Color(0xFF64748B),
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ),
@@ -280,34 +283,32 @@ class QuotationDocument extends StatelessWidget {
     }
 
     String? lastCategory;
+    var categoryNumber = 0;
     for (var i = 0; i < quotation.items.length; i++) {
       final item = quotation.items[i];
-      if (item.categoryName != lastCategory) {
-        lastCategory = item.categoryName;
+      final category = quotation.categories.where((value) =>
+        item.categoryId != null ? value.id == item.categoryId : value.categoryName == item.categoryName,
+      ).firstOrNull;
+      final categoryKey = item.categoryId?.toString() ?? item.categoryName;
+      if (categoryKey != lastCategory) {
+        lastCategory = categoryKey;
+        categoryNumber++;
         rows.add(
-          TableRow(
-            decoration: const BoxDecoration(color: Color(0xFFF1F5F9)),
-            children: [
-              for (var column = 0; column < 7; column++)
-                TableCell(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 6),
-                    child: column == 1
-                        ? Text(
-                            item.categoryName,
-                            style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
-                          )
-                        : const SizedBox.shrink(),
-                  ),
-                ),
-            ],
-          ),
+          TableRow(children: [
+            cell('$categoryNumber', align: TextAlign.center),
+            cell(item.categoryName, bold: true),
+            cell(category == null ? '' : _formatQty(category.quantity), align: TextAlign.center),
+            cell(category?.unit ?? '', align: TextAlign.center),
+            cell('', align: TextAlign.right),
+            cell('', align: TextAlign.right),
+            cell(category?.remark ?? ''),
+          ]),
         );
       }
       rows.add(
         TableRow(
           children: [
-            cell('${i + 1}', align: TextAlign.center),
+            cell('', align: TextAlign.center),
             cell(item.itemName),
             cell(_formatQty(item.quantity), align: TextAlign.center),
             cell(item.unit ?? '', align: TextAlign.center),
@@ -323,88 +324,35 @@ class QuotationDocument extends StatelessWidget {
     }
 
     return Table(
-      border: TableBorder.all(color: Color(0xFFE2E8F0)),
+      border: TableBorder.all(color: AppColors.border),
       columnWidths: columnWidths,
       defaultVerticalAlignment: TableCellVerticalAlignment.middle,
       children: rows,
     );
   }
 
+
   Widget _buildTotals(BuildContext context) {
-    final theme = Theme.of(context);
-
-    Widget totalRow(
-      String label,
-      String value, {
-      bool bold = false,
-      double fontSize = 15,
-    }) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              label,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
-                fontSize: fontSize,
-              ),
-            ),
-            Text(
-              value,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
-                fontSize: fontSize,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
     return Align(
       alignment: Alignment.centerRight,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 400),
-        child: Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            border: Border.all(color: Color(0xFFE2E8F0)),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Column(
-            children: [
-              totalRow('Items amount', AppFormatters.currency(baseAmount)),
-              Divider(height: 1, color: Color(0xFFE2E8F0)),
-              totalRow('Supervision charge (5%)', AppFormatters.currency(baseAmount * 0.05)),
-              totalRow('Safety charge (3%)', AppFormatters.currency(baseAmount * 0.03)),
-              Divider(height: 1, color: Color(0xFFE2E8F0)),
-              totalRow('Grand total', AppFormatters.currency(quotation.totalAmount), bold: true, fontSize: 18),
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Text(
-                  quotation.sayAmount == null
-                      ? 'Say: — MMK'
-                      : 'Say: ${AppFormatters.currency(quotation.sayAmount!)} MMK',
-                ),
-              ),
-            ],
-          ),
+        child: QuotationTotalsCard(
+          itemsAmount: baseAmount,
+          supervisionCharge: baseAmount * 0.05,
+          safetyCharge: baseAmount * 0.03,
+          grandTotal: quotation.totalAmount,
+          sayAmount: quotation.sayAmount,
         ),
       ),
     );
   }
 
-  double get baseAmount => quotation.items.fold(0, (sum, item) => sum + item.amount);
+  double get baseAmount => quotation.categories.isNotEmpty
+      ? quotation.categories.fold(0, (sum, category) => sum + category.amount)
+      : quotation.items.fold(0, (sum, item) => sum + item.amount);
 
   Widget _buildQrFooter() {
-    final viberLink = Uri(
-      scheme: 'viber',
-      host: 'chat',
-      queryParameters: {'number': CompanyInfo.viberNumber},
-    ).toString();
-
     return Center(
       child: Padding(
         padding: const EdgeInsets.only(top: 28),
@@ -412,18 +360,18 @@ class QuotationDocument extends StatelessWidget {
           children: [
             Text(
               'Scan to chat with us on Viber',
-              style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: Colors.white,
-                border: Border.all(color: Color(0xFFE2E8F0)),
+                border: Border.all(color: AppColors.border),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: QrImageView(
-                data: viberLink,
+                data: CompanyInfo.viberUrl,
                 size: 110,
                 backgroundColor: Colors.white,
               ),

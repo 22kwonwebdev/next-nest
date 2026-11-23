@@ -13,6 +13,7 @@ class QuotationItemCard extends StatelessWidget {
   final bool canRemove;
   final VoidCallback onChanged;
   final VoidCallback onRemove;
+  final Widget? dragHandle;
 
   const QuotationItemCard({
     super.key,
@@ -21,6 +22,7 @@ class QuotationItemCard extends StatelessWidget {
     required this.canRemove,
     required this.onChanged,
     required this.onRemove,
+    this.dragHandle,
   });
 
   @override
@@ -32,25 +34,6 @@ class QuotationItemCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Center(
-                  child: Text(
-                    '${index + 1}',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
               Text(
                 'Item',
                 style: TextStyle(
@@ -60,6 +43,7 @@ class QuotationItemCard extends StatelessWidget {
                 ),
               ),
               const Spacer(),
+              ?dragHandle,
               if (canRemove)
                 IconButton(
                   icon: const Icon(
@@ -73,14 +57,6 @@ class QuotationItemCard extends StatelessWidget {
                 ),
             ],
           ),
-          AppTextField(
-            controller: item.categoryController,
-            onChanged: (_) => onChanged(),
-            labelText: 'Category / work group *',
-            hintText: 'e.g. Car Parking Slab Work',
-            textCapitalization: TextCapitalization.sentences,
-          ),
-          const SizedBox(height: 12),
           AppTextField(
             controller: item.nameController,
             onChanged: (_) => onChanged(),
@@ -121,7 +97,7 @@ class QuotationItemCard extends StatelessWidget {
                 child: AppTextField(
                   controller: item.priceController,
                   onChanged: (_) => onChanged(),
-                  labelText: 'Unit price',
+                  labelText: 'Rate',
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
@@ -150,7 +126,7 @@ class QuotationItemCard extends StatelessWidget {
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ),

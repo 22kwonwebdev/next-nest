@@ -12,6 +12,7 @@ import '../../widgets/common/glass_card.dart';
 import '../../widgets/common/empty_state.dart';
 import '../../widgets/common/loading_widget.dart';
 import '../../widgets/common/section_header.dart';
+import '../../widgets/common/quotation_totals_card.dart';
 import '../quotation_form/quotation_form_screen.dart';
 import '../quotation_preview/quotation_preview_screen.dart';
 
@@ -41,14 +42,12 @@ class _QuotationDetailScreenState extends State<QuotationDetailScreen> {
   }
 
   Future<void> _edit() async {
-    final updated = await Navigator.of(context).push<bool>(
+    await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => QuotationFormScreen(quotationId: widget.quotationId),
       ),
     );
-    if (updated == true && mounted) {
-      _viewModel.load();
-    }
+    if (mounted) _viewModel.load();
   }
 
   void _openPreview(QuotationModel quotation) {
@@ -301,7 +300,7 @@ class _QuotationDetailScreenState extends State<QuotationDetailScreen> {
                   alignment: Alignment.centerLeft,
                   child: Text(
                     items[i].categoryName,
-                    style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary),
+                    style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textPrimary),
                   ),
                 ),
               ),
@@ -326,7 +325,7 @@ class _QuotationDetailScreenState extends State<QuotationDetailScreen> {
           SizedBox(
             width: 28,
             child: Text(
-              '#',
+              'SN',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
@@ -375,7 +374,7 @@ class _QuotationDetailScreenState extends State<QuotationDetailScreen> {
           SizedBox(
             width: 28,
             child: Text(
-              '${index + 1}',
+              item.serialNumber ?? '',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -435,38 +434,17 @@ class _QuotationDetailScreenState extends State<QuotationDetailScreen> {
   }
 
   Widget _buildTotalCard(BuildContext context, QuotationModel q) {
-    final base = q.items.fold<double>(0, (sum, item) => sum + item.amount);
-    return GlassCard(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-      tint: AppColors.primary.withValues(alpha: 0.10),
-      child: Column(
-        children: [
-          _totalLine('Items amount', base),
-          _totalLine('Supervision charge (5%)', base * 0.05),
-          _totalLine('Safety charge (3%)', base * 0.03),
-          const Divider(),
-          _totalLine('Grand total', q.totalAmount, bold: true),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              q.sayAmount == null
-                  ? 'Say: — MMK'
-                  : 'Say: ${AppFormatters.currency(q.sayAmount!)} MMK',
-            ),
-          ),
-        ],
-      ),
+    final base = q.categories.isNotEmpty
+        ? q.categories.fold<double>(0, (sum, category) => sum + category.amount)
+        : q.items.fold<double>(0, (sum, item) => sum + item.amount);
+    return QuotationTotalsCard(
+      itemsAmount: base,
+      supervisionCharge: base * 0.05,
+      safetyCharge: base * 0.03,
+      grandTotal: q.totalAmount,
+      sayAmount: q.sayAmount,
     );
   }
-
-  Widget _totalLine(String label, double amount, {bool bold = false}) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 3),
-    child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-      Text(label, style: TextStyle(fontWeight: bold ? FontWeight.w700 : FontWeight.w500)),
-      Text(AppFormatters.currency(amount), style: TextStyle(fontWeight: FontWeight.w700, color: bold ? AppColors.primary : AppColors.textPrimary)),
-    ]),
-  );
 
   String _formatQty(double value) {
     if (value == value.truncateToDouble()) {

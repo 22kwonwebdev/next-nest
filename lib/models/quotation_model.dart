@@ -1,4 +1,5 @@
 import 'quotation_item_model.dart';
+import 'quotation_category_model.dart';
 
 class QuotationModel {
   final int? id;
@@ -12,6 +13,7 @@ class QuotationModel {
   final String createdAt;
   final String updatedAt;
   final List<QuotationItemModel> items;
+  final List<QuotationCategoryModel> categories;
 
   const QuotationModel({
     this.id,
@@ -25,6 +27,7 @@ class QuotationModel {
     required this.createdAt,
     required this.updatedAt,
     this.items = const [],
+    this.categories = const [],
   });
 
   factory QuotationModel.fromMap(Map<String, dynamic> map) {
@@ -69,6 +72,7 @@ class QuotationModel {
     String? createdAt,
     String? updatedAt,
     List<QuotationItemModel>? items,
+    List<QuotationCategoryModel>? categories,
   }) {
     return QuotationModel(
       id: id ?? this.id,
@@ -82,6 +86,7 @@ class QuotationModel {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       items: items ?? this.items,
+      categories: categories ?? this.categories,
     );
   }
 }

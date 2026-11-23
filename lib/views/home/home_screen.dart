@@ -10,7 +10,6 @@ import '../../widgets/common/app_background.dart';
 import '../../widgets/common/error_widget.dart';
 import '../../widgets/common/loading_widget.dart';
 import 'widgets/dashboard_header.dart';
-import 'widgets/monthly_overview.dart';
 import 'widgets/quick_actions.dart';
 import 'widgets/recent_quotations.dart';
 import 'widgets/summary_card.dart';
@@ -71,8 +70,6 @@ class HomeScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 20),
                           RecentQuotations(onViewAll: onQuotationsTab),
-                          const SizedBox(height: 20),
-                          const MonthlyOverview(),
                         ],
                       ),
                     ),

@@ -10,7 +10,7 @@ class DatabaseHelper {
 
   static final DatabaseHelper instance = DatabaseHelper._();
 
-  static const int _databaseVersion = 6;
+  static const int _databaseVersion = 8;
   static const String _databaseName = 'quotation.db';
 
   final String? _dbPath;
@@ -95,6 +95,39 @@ class DatabaseHelper {
           await db.execute('ALTER TABLE quotations ADD COLUMN say_amount REAL');
           await db.execute('DROP TABLE IF EXISTS quotation_categories');
         }
+        if (oldVersion < 7) {
+          await db.execute('''
+            CREATE TABLE quotation_categories (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              quotation_id INTEGER NOT NULL,
+              category_name TEXT NOT NULL,
+              rate REAL NOT NULL DEFAULT 0,
+              unit TEXT,
+              quantity REAL NOT NULL DEFAULT 1,
+              amount REAL NOT NULL DEFAULT 0,
+              remark TEXT,
+              FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+            )
+          ''');
+          await db.execute('''
+            INSERT INTO quotation_categories (quotation_id, category_name, amount)
+            SELECT quotation_id, category_name, SUM(amount)
+            FROM quotation_items GROUP BY quotation_id, category_name
+          ''');
+          await db.execute('ALTER TABLE quotation_items ADD COLUMN category_id INTEGER REFERENCES quotation_categories(id) ON DELETE CASCADE');
+          await db.execute('''
+            UPDATE quotation_items SET category_id = (
+              SELECT id FROM quotation_categories
+              WHERE quotation_categories.quotation_id = quotation_items.quotation_id
+                AND quotation_categories.category_name = quotation_items.category_name
+              LIMIT 1
+            )
+          ''');
+          await db.execute('ALTER TABLE quotation_items ADD COLUMN serial_number TEXT');
+        }
+        if (oldVersion < 8) {
+          await _createReceivedTables(db);
+        }
       },
     );
   }
@@ -116,9 +149,25 @@ class DatabaseHelper {
     ''');
 
     await db.execute('''
+      CREATE TABLE quotation_categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        quotation_id INTEGER NOT NULL,
+        category_name TEXT NOT NULL,
+        rate REAL NOT NULL DEFAULT 0,
+        unit TEXT,
+        quantity REAL NOT NULL DEFAULT 1,
+        amount REAL NOT NULL DEFAULT 0,
+        remark TEXT,
+        FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+      )
+    ''');
+
+    await db.execute('''
       CREATE TABLE quotation_items (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         quotation_id INTEGER NOT NULL,
+        category_id INTEGER NOT NULL,
+        serial_number TEXT,
         item_name TEXT NOT NULL,
         category_name TEXT NOT NULL DEFAULT 'General',
         quantity REAL NOT NULL,
@@ -126,7 +175,8 @@ class DatabaseHelper {
         unit_price REAL NOT NULL,
         amount REAL NOT NULL,
         remark TEXT,
-        FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE
+        FOREIGN KEY (quotation_id) REFERENCES quotations(id) ON DELETE CASCADE,
+        FOREIGN KEY (category_id) REFERENCES quotation_categories(id) ON DELETE CASCADE
       )
     ''');
 
@@ -134,7 +184,41 @@ class DatabaseHelper {
       'CREATE INDEX idx_quotation_items_quotation_id '
       'ON quotation_items(quotation_id)',
     );
+    await _createReceivedTables(db);
+  }
 
+  Future<void> _createReceivedTables(DatabaseExecutor db) async {
+    await db.execute('''
+      CREATE TABLE received_documents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        received_no TEXT NOT NULL UNIQUE,
+        intention_to TEXT NOT NULL,
+        project_title TEXT NOT NULL,
+        subject TEXT NOT NULL,
+        received_date TEXT NOT NULL,
+        total_amount REAL NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE received_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        received_id INTEGER NOT NULL,
+        position INTEGER NOT NULL,
+        particular TEXT NOT NULL,
+        quantity REAL NOT NULL DEFAULT 1,
+        unit TEXT,
+        rate REAL NOT NULL DEFAULT 0,
+        amount REAL NOT NULL DEFAULT 0,
+        remark TEXT,
+        FOREIGN KEY (received_id) REFERENCES received_documents(id) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX idx_received_items_received_id '
+      'ON received_items(received_id, position)',
+    );
   }
 
   Future<T> transaction<T>(Future<T> Function(Transaction txn) action) async {

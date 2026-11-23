@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -10,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 
 class ImageService {
   static const _downloadsChannel = MethodChannel('quotation_app/downloads');
+  static const _galleryChannel = MethodChannel('quotation_app/gallery');
   /// Captures the widget inside [boundaryKey] as PNG bytes.
   /// Returns null if the boundary is not attached to the render tree.
   Future<Uint8List?> capturePng(
@@ -35,18 +35,44 @@ class ImageService {
     return Uint8List.fromList(img.encodeJpg(decoded, quality: quality));
   }
 
-  /// Saves Android exports to the public Downloads folder. Other platforms use
-  /// the app documents directory, which does not require external storage access.
-  Future<File> saveToLocal(String fileName, Uint8List bytes) async {
+  /// Saves PDFs to the public Downloads folder where supported.
+  Future<String> saveToDownloads(String fileName, Uint8List bytes) async {
     if (Platform.isAndroid) {
       final path = await _downloadsChannel.invokeMethod<String>(
         'saveToDownloads',
         {'fileName': fileName, 'bytes': bytes},
       );
-      if (path == null) throw StateError('Android did not return saved file path');
-      return File(path);
+      if (path == null) throw StateError('Android did not return the saved location');
+      return path;
     }
 
+    final dir = await getApplicationDocumentsDirectory();
+    final downloadDir = Directory('${dir.path}/Downloads');
+    if (!await downloadDir.exists()) {
+      await downloadDir.create(recursive: true);
+    }
+    final file = File('${downloadDir.path}/$fileName');
+    await file.writeAsBytes(bytes, flush: true);
+    return file.path;
+  }
+
+  /// Saves PNG/JPG bytes to the device Photos/Gallery library on mobile.
+  Future<String> saveImageToGallery(String fileName, Uint8List bytes) async {
+    if (Platform.isAndroid || Platform.isIOS) {
+      final location = await _galleryChannel.invokeMethod<String>(
+        'saveImageToGallery',
+        {'fileName': fileName, 'bytes': bytes},
+      );
+      if (location == null) throw StateError('Image was not saved to gallery');
+      return location;
+    }
+
+    final file = await saveToLocal(fileName, bytes);
+    return file.path;
+  }
+
+  /// Writes a shareable copy to app storage without choosing a public location.
+  Future<File> saveToLocal(String fileName, Uint8List bytes) async {
     final dir = await getApplicationDocumentsDirectory();
     final exportDir = Directory('${dir.path}/exports');
     if (!await exportDir.exists()) {

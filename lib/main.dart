@@ -16,8 +16,9 @@ import 'views/quotation_detail/quotation_detail_screen.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await DatabaseHelper.instance.database;
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -96,29 +97,27 @@ class _QuotationAppState extends State<QuotationApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        Provider<QuotationRepository>(
-          create: (_) => QuotationRepository(dbHelper: DatabaseHelper.instance),
-        ),
-        ChangeNotifierProvider<QuotationListViewModel>(
-          create: (context) => QuotationListViewModel(
-            repository: context.read<QuotationRepository>(),
+    return MaterialApp(
+      navigatorKey: navigatorKey,
+      title: AppConstants.appName,
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.light(),
+      themeMode: ThemeMode.light,
+      home: MultiProvider(
+        providers: [
+          Provider<QuotationRepository>(create: (_) => QuotationRepository()),
+          ChangeNotifierProvider<QuotationListViewModel>(
+            create: (context) => QuotationListViewModel(
+              repository: context.read<QuotationRepository>(),
+            ),
           ),
-        ),
-        ChangeNotifierProvider<HomeViewModel>(
-          create: (context) =>
-              HomeViewModel(repository: context.read<QuotationRepository>())
-                ..load(),
-        ),
-      ],
-      child: MaterialApp(
-        navigatorKey: navigatorKey,
-        title: AppConstants.appName,
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.light(),
-        themeMode: ThemeMode.light,
-        home: const HomeShell(),
+          ChangeNotifierProvider<HomeViewModel>(
+            create: (context) => HomeViewModel(
+              repository: context.read<QuotationRepository>(),
+            )..load(),
+          ),
+        ],
+        child: const HomeShell(),
       ),
     );
   }

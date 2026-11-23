@@ -77,6 +77,17 @@ class _QuotationListScreenState extends State<QuotationListScreen> {
     }
   }
 
+  Future<void> _editQuotation(QuotationModel quotation) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => QuotationFormScreen(quotationId: quotation.id),
+      ),
+    );
+    if (mounted) {
+      context.read<QuotationListViewModel>().loadQuotations();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<QuotationListViewModel>();
@@ -84,6 +95,7 @@ class _QuotationListScreenState extends State<QuotationListScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Quotations')),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: null,
         onPressed: () async {
           await Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const QuotationFormScreen()),
@@ -180,6 +192,7 @@ class _QuotationListScreenState extends State<QuotationListScreen> {
               );
               if (context.mounted) viewModel.loadQuotations();
             },
+            onEdit: () => _editQuotation(quotation),
             onDelete: () => _confirmDelete(quotation),
           );
         },

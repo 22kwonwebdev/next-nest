@@ -4,6 +4,7 @@ import 'package:sqflite/sqflite.dart';
 import '../core/database/database_helper.dart';
 import '../models/dashboard_stats.dart';
 import '../models/quotation_item_model.dart';
+import '../models/quotation_category_model.dart';
 import '../models/quotation_model.dart';
 
 class QuotationRepository {
@@ -18,6 +19,7 @@ class QuotationRepository {
   String _now() => DateFormat(_dateTimeFormat).format(DateTime.now());
 
   Future<List<QuotationModel>> getAllQuotations({String? search}) async {
+
     final db = await _dbHelper.database;
 
     final where = <String>[];
@@ -42,6 +44,7 @@ class QuotationRepository {
 
   /// Aggregate dashboard statistics computed in SQL (no row loading).
   Future<DashboardStats> getDashboardStats() async {
+
     final db = await _dbHelper.database;
     final currentMonth = DateFormat('yyyy-MM').format(DateTime.now());
 
@@ -62,6 +65,7 @@ class QuotationRepository {
   }
 
   Future<List<QuotationModel>> getRecentQuotations({int limit = 5}) async {
+
     final db = await _dbHelper.database;
 
     final rows = await db.query(
@@ -77,6 +81,7 @@ class QuotationRepository {
   Future<List<({String month, double total})>> getMonthlyTotals({
     int months = 6,
   }) async {
+
     final db = await _dbHelper.database;
 
     final rows = await db.rawQuery(
@@ -101,6 +106,7 @@ class QuotationRepository {
   }
 
   Future<QuotationModel?> getQuotationById(int id) async {
+
     final db = await _dbHelper.database;
 
     final rows = await db.query(
@@ -114,19 +120,34 @@ class QuotationRepository {
 
     final quotation = QuotationModel.fromMap(rows.first);
     final items = await _getItemsForQuotation(db, id);
-    return quotation.copyWith(items: items);
+    final categoryRows = await db.query('quotation_categories', where: 'quotation_id = ?', whereArgs: [id], orderBy: 'id ASC');
+    final categories = categoryRows.map((row) {
+      final categoryId = row['id'] as int;
+      return QuotationCategoryModel(
+        id: categoryId,
+        quotationId: id,
+        categoryName: row['category_name'] as String,
+        rate: (row['rate'] as num).toDouble(),
+        unit: row['unit'] as String?,
+        quantity: (row['quantity'] as num).toDouble(),
+        amount: (row['amount'] as num).toDouble(),
+        remark: row['remark'] as String?,
+        items: items.where((item) => item.categoryId == categoryId).toList(),
+      );
+    }).toList();
+    return quotation.copyWith(items: items, categories: categories);
   }
 
   Future<List<QuotationItemModel>> _getItemsForQuotation(
     Database db,
     int quotationId,
   ) async {
-    final rows = await db.query(
-      'quotation_items',
-      where: 'quotation_id = ?',
-      whereArgs: [quotationId],
-      orderBy: 'id ASC',
-    );
+    final rows = await db.rawQuery('''
+      SELECT quotation_items.*, quotation_categories.amount AS category_amount
+      FROM quotation_items
+      LEFT JOIN quotation_categories ON quotation_categories.id = quotation_items.category_id
+      WHERE quotation_items.quotation_id = ? ORDER BY quotation_items.id ASC
+    ''', [quotationId]);
     return _groupItemsByCategory(rows.map(QuotationItemModel.fromMap).toList());
   }
 
@@ -145,6 +166,7 @@ class QuotationRepository {
   }
 
   Future<String> generateQuotationNo() async {
+
     final db = await _dbHelper.database;
     return _nextQuotationNo(db);
   }
@@ -174,6 +196,8 @@ class QuotationRepository {
   Future<int> insertQuotation(QuotationModel quotation) async {
     final now = _now();
 
+
+
     return _dbHelper.transaction((txn) async {
       final quotationNo = await _ensureUniqueQuotationNo(
         txn,
@@ -191,7 +215,7 @@ class QuotationRepository {
         quotationToInsert.toMap()..remove('id'),
       );
 
-      await _insertItems(txn, quotationId, quotation.items);
+      await _insertItems(txn, quotationId, quotation);
       return quotationId;
     });
   }
@@ -218,6 +242,8 @@ class QuotationRepository {
 
     final updated = quotation.copyWith(updatedAt: _now());
 
+
+
     return _dbHelper.transaction((txn) async {
       await txn.update(
         'quotations',
@@ -233,13 +259,19 @@ class QuotationRepository {
         where: 'quotation_id = ?',
         whereArgs: [quotation.id],
       );
+      await txn.delete(
+        'quotation_categories',
+        where: 'quotation_id = ?',
+        whereArgs: [quotation.id],
+      );
 
-      await _insertItems(txn, quotation.id!, quotation.items);
+      await _insertItems(txn, quotation.id!, quotation);
       return quotation.id!;
     });
   }
 
   Future<int> deleteQuotation(int id) async {
+
     final db = await _dbHelper.database;
     return db.delete('quotations', where: 'id = ?', whereArgs: [id]);
   }
@@ -255,11 +287,58 @@ class QuotationRepository {
   Future<void> _insertItems(
     Transaction txn,
     int quotationId,
-    List<QuotationItemModel> items,
+    QuotationModel quotation,
   ) async {
+    if (quotation.categories.isNotEmpty) {
+      for (final category in quotation.categories) {
+        final categoryId = await txn.insert('quotation_categories', {
+          'quotation_id': quotationId,
+          'category_name': category.categoryName,
+          'rate': category.rate,
+          'unit': category.unit,
+          'quantity': category.quantity,
+          'amount': category.amount,
+          'remark': category.remark,
+        });
+        for (final item in category.items) {
+          await txn.insert('quotation_items', {
+            'quotation_id': quotationId,
+            'category_id': categoryId,
+            'serial_number': item.serialNumber,
+            'item_name': item.itemName,
+            'category_name': category.categoryName,
+            'quantity': item.quantity,
+            'unit': item.unit,
+            'unit_price': item.unitPrice,
+            'amount': item.amount,
+            'remark': item.remark,
+          });
+        }
+      }
+      return;
+    }
+    final items = quotation.items;
+    final grouped = <String, List<QuotationItemModel>>{};
     for (final item in _groupItemsByCategory(items)) {
+      grouped.putIfAbsent(item.categoryName, () => []).add(item);
+    }
+    for (final entry in grouped.entries) {
+      final categoryItems = entry.value;
+      final first = categoryItems.first;
+      final categoryId = await txn.insert('quotation_categories', {
+        'quotation_id': quotationId,
+        'category_name': entry.key,
+        'rate': first.unitPrice,
+        'unit': first.unit,
+        'quantity': first.quantity,
+        'amount': first.categoryAmount ?? first.amount,
+        'remark': first.remark,
+      });
+      for (final item in categoryItems) {
       await txn.insert('quotation_items', {
         'quotation_id': quotationId,
+        'category_id': categoryId,
+        'serial_number': item.serialNumber,
         'item_name': item.itemName,
         'category_name': item.categoryName,
         'quantity': item.quantity,
@@ -268,6 +347,7 @@ class QuotationRepository {
         'amount': item.amount,
         'remark': item.remark,
       });
+      }
     }
   }
 

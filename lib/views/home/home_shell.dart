@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../received/received_list_screen.dart';
 import '../quotation_list/quotation_list_screen.dart';
 import '../settings/settings_screen.dart';
 import 'home_screen.dart';
 
-/// Root shell with bottom navigation: Home / Quotations / Settings.
-/// Uses IndexedStack so each tab keeps its state and scroll position.
+/// Root shell with lazy tabs; opened tabs retain their state and scroll position.
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
 
@@ -16,10 +16,31 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _selectedIndex = 0;
+  final List<Widget?> _tabs = List<Widget?>.filled(4, null);
+
+  @override
+  void initState() {
+    super.initState();
+    _tabs[0] = _buildTab(0);
+  }
+
+  Widget _buildTab(int index) => switch (index) {
+    0 => HomeScreen(
+      onQuotationsTab: () => _selectTab(1),
+      onSettingsTab: () => _selectTab(3),
+    ),
+    1 => const QuotationListScreen(),
+    2 => const ReceivedListScreen(),
+    3 => const SettingsScreen(),
+    _ => throw RangeError.index(index, _tabs),
+  };
 
   void _selectTab(int index) {
     if (_selectedIndex == index) return;
-    setState(() => _selectedIndex = index);
+    setState(() {
+      _selectedIndex = index;
+      _tabs[index] ??= _buildTab(index);
+    });
   }
 
   @override
@@ -27,14 +48,7 @@ class _HomeShellState extends State<HomeShell> {
     return Scaffold(
       body: IndexedStack(
         index: _selectedIndex,
-        children: [
-          HomeScreen(
-            onQuotationsTab: () => _selectTab(1),
-            onSettingsTab: () => _selectTab(2),
-          ),
-          const QuotationListScreen(),
-          const SettingsScreen(),
-        ],
+        children: [for (final tab in _tabs) tab ?? const SizedBox.shrink()],
       ),
       bottomNavigationBar: FloatingTabBar(
         selectedIndex: _selectedIndex,
@@ -66,6 +80,11 @@ class FloatingTabBar extends StatelessWidget {
       selectedIcon: Icons.description_rounded,
     ),
     _TabDestination(
+      label: 'Received',
+      icon: Icons.move_to_inbox_outlined,
+      selectedIcon: Icons.move_to_inbox_rounded,
+    ),
+    _TabDestination(
       label: 'Settings',
       icon: Icons.settings_outlined,
       selectedIcon: Icons.settings_rounded,
@@ -74,42 +93,66 @@ class FloatingTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final barColor = isDark ? AppColors.darkSurface : AppColors.lightSurface;
-
     return SafeArea(
       top: false,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
         child: Container(
-          height: 64,
+          height: 68,
           decoration: BoxDecoration(
-            color: barColor,
-            borderRadius: BorderRadius.circular(32),
-            border: Border.all(
-              color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
-              width: 0.7,
-            ),
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: AppColors.border),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.20 : 0.08),
-                blurRadius: 22,
+                color: AppColors.primary.withValues(alpha: 0.1),
+                blurRadius: 20,
                 offset: const Offset(0, 6),
               ),
             ],
           ),
           clipBehavior: Clip.antiAlias,
-          child: Row(
-            children: [
-              for (var index = 0; index < _destinations.length; index++)
-                Expanded(
-                  child: _TabBarItem(
-                    destination: _destinations[index],
-                    selected: selectedIndex == index,
-                    onTap: () => onDestinationSelected(index),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final segmentWidth = constraints.maxWidth / _destinations.length;
+              return Stack(
+                children: [
+                  AnimatedPositionedDirectional(
+                    duration: const Duration(milliseconds: 360),
+                    curve: Curves.easeInOutCubicEmphasized,
+                    start: selectedIndex * segmentWidth + 4,
+                    width: segmentWidth - 8,
+                    top: 4,
+                    bottom: 4,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.22),
+                            blurRadius: 10,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-            ],
+                  Row(
+                    children: [
+                      for (var index = 0; index < _destinations.length; index++)
+                        Expanded(
+                          child: _TabBarItem(
+                            destination: _destinations[index],
+                            selected: selectedIndex == index,
+                            onTap: () => onDestinationSelected(index),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ),
@@ -142,7 +185,9 @@ class _TabBarItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? AppColors.primary : AppColors.textSecondary;
+    final color = selected
+        ? AppColors.onPrimary
+        : AppColors.textPrimary.withValues(alpha: 0.62);
 
     return Semantics(
       button: true,
@@ -158,7 +203,11 @@ class _TabBarItem extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 180),
+                  duration: const Duration(milliseconds: 220),
+                  transitionBuilder: (child, animation) => ScaleTransition(
+                    scale: animation,
+                    child: FadeTransition(opacity: animation, child: child),
+                  ),
                   child: Icon(
                     selected ? destination.selectedIcon : destination.icon,
                     key: ValueKey(selected),

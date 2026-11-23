@@ -89,7 +89,7 @@ class RecentQuotations extends StatelessWidget {
               child: const Icon(
                 Icons.description_outlined,
                 size: 18,
-                color: AppColors.primary,
+                color: AppColors.accent,
               ),
             ),
             const SizedBox(width: 12),
@@ -126,7 +126,7 @@ class RecentQuotations extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
-                color: AppColors.primary,
+                color: AppColors.textPrimary,
               ),
             ),
           ],
